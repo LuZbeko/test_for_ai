@@ -7,7 +7,7 @@
 
 ### Features
 
-- [ ] Project setup with TypeScript, Express, and database configuration - Initialize Node.js project with TypeScript support `S`
+- [x] Project setup with TypeScript, Express, and database configuration - Initialize Node.js project with TypeScript support `S`
 - [ ] Create Todo endpoint - POST /todos with validation and ID generation `S`
 - [ ] Read Todo endpoints - GET /todos and GET /todos/:id with proper responses `S`
 - [ ] Update Todo endpoint - PUT /todos/:id with partial update support `S`
@@ -47,11 +47,11 @@
 
 ### Features
 
-- [ ] Security middleware - Add Helmet, CORS, and rate limiting `S`
-- [ ] Environment configuration - Setup .env for different environments `XS`
-- [ ] Docker containerization - Create Dockerfile and docker-compose.yml `S`
-- [ ] Health check endpoint - GET /health for monitoring `XS`
-- [ ] Database migrations - Setup migration system with Prisma `S`
+- [x] Security middleware - Add Helmet, CORS, and rate limiting `S`
+- [x] Environment configuration - Setup .env for different environments `XS`
+- [x] Docker containerization - Create Dockerfile and docker-compose.yml `S`
+- [x] Health check endpoint - GET /health for monitoring `XS`
+- [x] Database migrations - Setup migration system with Prisma `S`
 
 ### Dependencies
 
