@@ -1,0 +1,65 @@
+# Dependency directories
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+dist
+build
+*.tsbuildinfo
+
+# Environment files (will be mounted or configured separately)
+.env
+.env.local
+.env.*.local
+
+# Database files (will be in persistent volume)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+prisma/dev.db
+prisma/dev.db-journal
+
+# Testing
+coverage
+.nyc_output
+*.lcov
+tests
+
+# Development files
+.git
+.gitignore
+README.md
+CHANGELOG.md
+LICENSE
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Logs
+logs
+*.log
+
+# Temporary files
+tmp
+temp
+.cache
+
+# Documentation
+docs/
+*.md
