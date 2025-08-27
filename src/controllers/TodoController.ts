@@ -462,7 +462,8 @@ export class TodoController {
 
       // Process description - trim if provided, allow null
       if (description !== undefined) {
-        updateData.description = description === null ? null : description.trim();
+        updateData.description =
+          description === null ? null : description.trim();
       }
 
       // Process completed status
@@ -647,6 +648,118 @@ export class TodoController {
         500
       );
 
+      res.status(500).json(errorResponse);
+    }
+  }
+
+  /**
+   * Update an existing todo item
+   * PUT /api/todos/:id
+   */
+  static async updateTodo(
+    req: Request,
+    res: Response,
+    _next: NextFunction
+  ): Promise<void> {
+    try {
+      const { id } = req.params;
+      const updateData: UpdateTodoRequest = req.body;
+
+      // Log the incoming request
+      console.log('Updating todo:', {
+        id,
+        fieldsToUpdate: Object.keys(updateData),
+        timestamp: new Date().toISOString(),
+      });
+
+      // Check if todo exists first
+      const existingTodo = await prisma.todo.findUnique({
+        where: { id },
+      });
+
+      if (!existingTodo) {
+        const errorResponse = createErrorResponse(
+          'Not Found',
+          'Todo not found',
+          404
+        );
+        res.status(404).json(errorResponse);
+        return;
+      }
+
+      // Build update data object with only provided fields
+      const updatePayload: any = {};
+
+      if (updateData.title !== undefined) {
+        updatePayload.title = updateData.title;
+      }
+
+      if (updateData.description !== undefined) {
+        updatePayload.description = updateData.description;
+      }
+
+      if (updateData.completed !== undefined) {
+        updatePayload.completed = updateData.completed;
+      }
+
+      if (updateData.priority !== undefined) {
+        updatePayload.priority = updateData.priority;
+      }
+
+      if (updateData.dueDate !== undefined) {
+        if (updateData.dueDate === null) {
+          updatePayload.dueDate = null;
+        } else {
+          updatePayload.dueDate = new Date(updateData.dueDate);
+        }
+      }
+
+      if (updateData.tags !== undefined) {
+        updatePayload.tags = updateData.tags;
+      }
+
+      // Update the todo in the database
+      const updatedTodo = await prisma.todo.update({
+        where: { id },
+        data: updatePayload,
+      });
+
+      // Log successful update
+      console.log('Todo updated successfully:', {
+        id: updatedTodo.id,
+        title: updatedTodo.title,
+        fieldsUpdated: Object.keys(updatePayload),
+        timestamp: new Date().toISOString(),
+      });
+
+      // Format response data with ISO string dates
+      const responseData = {
+        ...updatedTodo,
+        createdAt: updatedTodo.createdAt.toISOString(),
+        updatedAt: updatedTodo.updatedAt.toISOString(),
+        dueDate: updatedTodo.dueDate ? updatedTodo.dueDate.toISOString() : null,
+      };
+
+      // Send success response
+      const successResponse = createSuccessResponse(
+        responseData,
+        'Todo updated successfully'
+      );
+      res.status(200).json(successResponse);
+    } catch (error) {
+      // Log the error
+      console.error('Error updating todo:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Send error response
+      const errorResponse = createErrorResponse(
+        'Internal Server Error',
+        'Failed to update todo',
+        500
+      );
       res.status(500).json(errorResponse);
     }
   }

@@ -1,4 +1,4 @@
-import { body, ValidationChain } from 'express-validator';
+import { body, param, ValidationChain } from 'express-validator';
 
 /**
  * Validation rules for creating a new todo
@@ -126,4 +126,151 @@ export const validateTodoBusinessRules: ValidationChain[] = [
       }
       return true;
     }),
+];
+
+/**
+ * Validation rules for updating an existing todo (partial update support)
+ */
+export const validateTodoUpdate: ValidationChain[] = [
+  // Title validation - optional, string, 1-255 characters when provided
+  body('title')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Title must be between 1 and 255 characters')
+    .custom((value) => {
+      // Ensure trimmed value has actual content
+      const trimmed = value?.trim();
+      if (trimmed !== undefined && trimmed.length === 0) {
+        throw new Error('Title cannot be empty or contain only whitespace');
+      }
+      return true;
+    }),
+
+  // Description validation - optional, string, max 1000 characters
+  body('description')
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null) return true; // Allow null
+      if (typeof value !== 'string') {
+        throw new Error('Description must be a string or null');
+      }
+      return true;
+    })
+    .trim()
+    .isLength({ max: 1000 })
+    .withMessage('Description must not exceed 1000 characters'),
+
+  // Completed validation - optional, boolean
+  body('completed')
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null) return true; // Allow null for consistency
+      if (typeof value !== 'boolean') {
+        throw new Error('Completed must be a boolean value');
+      }
+      return true;
+    }),
+
+  // Priority validation - optional, enum values
+  body('priority')
+    .optional()
+    .isIn(['low', 'medium', 'high'])
+    .withMessage('Priority must be one of: low, medium, high'),
+
+  // Due date validation - optional, ISO 8601 date string, must be future date
+  body('dueDate')
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null) return true; // Allow null
+      if (value === undefined || value === '') return true; // Skip if not provided
+
+      // Check if valid ISO 8601 format
+      const date = new Date(value);
+      if (isNaN(date.getTime())) {
+        throw new Error('Due date must be a valid date in ISO 8601 format');
+      }
+
+      // Check if future date
+      const now = new Date();
+      if (date <= now) {
+        throw new Error('Due date must be a future date');
+      }
+
+      // Check if not too far in future (10 years)
+      const maxFutureDate = new Date();
+      maxFutureDate.setFullYear(maxFutureDate.getFullYear() + 10);
+      if (date > maxFutureDate) {
+        throw new Error('Due date cannot be more than 10 years in the future');
+      }
+
+      return true;
+    }),
+
+  // Tags validation - optional, JSON string array, max 10 tags
+  body('tags')
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null || value === undefined || value === '') {
+        return true; // Allow null/empty values
+      }
+
+      try {
+        const tags = JSON.parse(value);
+
+        // Must be an array
+        if (!Array.isArray(tags)) {
+          throw new Error('Tags must be a valid JSON array');
+        }
+
+        // Maximum 10 tags
+        if (tags.length > 10) {
+          throw new Error('Maximum 10 tags allowed');
+        }
+
+        // Each tag must be a string and max 50 characters
+        for (const tag of tags) {
+          if (typeof tag !== 'string') {
+            throw new Error('Each tag must be a string');
+          }
+          if (tag.length > 50) {
+            throw new Error('Each tag must not exceed 50 characters');
+          }
+        }
+
+        return true;
+      } catch (error) {
+        if (error instanceof Error) {
+          throw error;
+        }
+        throw new Error('Tags must be a valid JSON array');
+      }
+    }),
+
+  // At least one field must be provided for update
+  body().custom((value) => {
+    const allowedFields = [
+      'title',
+      'description',
+      'completed',
+      'priority',
+      'dueDate',
+      'tags',
+    ];
+    const providedFields = Object.keys(value || {}).filter((key) =>
+      allowedFields.includes(key)
+    );
+
+    if (providedFields.length === 0) {
+      throw new Error('At least one field must be provided for update');
+    }
+    return true;
+  }),
+];
+
+/**
+ * Validation for UUID parameter
+ */
+export const validateUuidParam: ValidationChain[] = [
+  param('id').isUUID().withMessage('ID must be a valid UUID'),
 ];

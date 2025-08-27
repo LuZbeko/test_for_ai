@@ -36,6 +36,7 @@ const mockValidatedRequest = (_req: Request, _res: Response, next: NextFunction)
 app.post('/test-controller', mockValidatedRequest, TodoController.create);
 app.get('/test-controller', TodoController.getAll);
 app.get('/test-controller/:id', TodoController.getById);
+app.put('/test-controller/:id', mockValidatedRequest, TodoController.updateTodo);
 
 describe('TodoController', () => {
   beforeEach(() => {
@@ -1221,6 +1222,391 @@ describe('TodoController', () => {
         expect(result.createdAt).toEqual(originalCreatedAt);
         expect(result.updatedAt).toEqual(newUpdatedAt);
         expect(result.updatedAt.getTime()).toBeGreaterThan(result.createdAt.getTime());
+      });
+    });
+  });
+
+  describe('updateTodo method', () => {
+    describe('Successful Updates', () => {
+      test('should update todo with partial data', async () => {
+        const todoId = '550e8400-e29b-41d4-a716-446655440000';
+        const updateData = {
+          title: 'Updated Title'
+        };
+
+        const mockUpdatedTodo = {
+          id: todoId,
+          title: 'Updated Title',
+          description: 'Original description',
+          completed: false,
+          priority: 'medium',
+          dueDate: null,
+          tags: null,
+          createdAt: new Date('2025-08-27T10:00:00.000Z'),
+          updatedAt: new Date('2025-08-27T12:00:00.000Z'),
+        };
+
+        mockTodoFindUnique.mockResolvedValue({
+          id: todoId,
+          title: 'Original Title',
+          description: 'Original description',
+          completed: false,
+          priority: 'medium',
+          dueDate: null,
+          tags: null,
+          createdAt: new Date('2025-08-27T10:00:00.000Z'),
+          updatedAt: new Date('2025-08-27T10:00:00.000Z'),
+        });
+
+        mockTodoUpdate.mockResolvedValue(mockUpdatedTodo);
+
+        const response = await request(app)
+          .put(`/test-controller/${todoId}`)
+          .send(updateData)
+          .expect(200);
+
+        expect(response.body.success).toBe(true);
+        expect(response.body.data).toEqual({
+          ...mockUpdatedTodo,
+          createdAt: '2025-08-27T10:00:00.000Z',
+          updatedAt: '2025-08-27T12:00:00.000Z',
+        });
+        expect(response.body.message).toBe('Todo updated successfully');
+
+        expect(mockTodoFindUnique).toHaveBeenCalledWith({
+          where: { id: todoId },
+        });
+
+        expect(mockTodoUpdate).toHaveBeenCalledWith({
+          where: { id: todoId },
+          data: {
+            title: 'Updated Title',
+          },
+        });
+      });
+
+      test('should update multiple fields', async () => {
+        const todoId = '550e8400-e29b-41d4-a716-446655440000';
+        const futureDate = new Date('2025-12-31T23:59:59.000Z');
+        const updateData = {
+          title: 'Updated Title',
+          description: 'Updated description',
+          completed: true,
+          priority: 'high',
+          dueDate: futureDate.toISOString(),
+          tags: '["updated", "test"]'
+        };
+
+        const mockExistingTodo = {
+          id: todoId,
+          title: 'Original Title',
+          description: 'Original description',
+          completed: false,
+          priority: 'medium',
+          dueDate: null,
+          tags: null,
+          createdAt: new Date('2025-08-27T10:00:00.000Z'),
+          updatedAt: new Date('2025-08-27T10:00:00.000Z'),
+        };
+
+        const mockUpdatedTodo = {
+          id: todoId,
+          title: 'Updated Title',
+          description: 'Updated description',
+          completed: true,
+          priority: 'high',
+          dueDate: futureDate,
+          tags: '["updated", "test"]',
+          createdAt: new Date('2025-08-27T10:00:00.000Z'),
+          updatedAt: new Date('2025-08-27T14:00:00.000Z'),
+        };
+
+        mockTodoFindUnique.mockResolvedValue(mockExistingTodo);
+        mockTodoUpdate.mockResolvedValue(mockUpdatedTodo);
+
+        const response = await request(app)
+          .put(`/test-controller/${todoId}`)
+          .send(updateData)
+          .expect(200);
+
+        expect(response.body.success).toBe(true);
+        expect(response.body.data.title).toBe('Updated Title');
+        expect(response.body.data.completed).toBe(true);
+        expect(response.body.data.priority).toBe('high');
+
+        expect(mockTodoUpdate).toHaveBeenCalledWith({
+          where: { id: todoId },
+          data: {
+            title: 'Updated Title',
+            description: 'Updated description',
+            completed: true,
+            priority: 'high',
+            dueDate: futureDate,
+            tags: '["updated", "test"]',
+          },
+        });
+      });
+
+      test('should update fields to null values', async () => {
+        const todoId = '550e8400-e29b-41d4-a716-446655440000';
+        const updateData = {
+          description: null,
+          dueDate: null,
+          tags: null
+        };
+
+        const mockExistingTodo = {
+          id: todoId,
+          title: 'Test Todo',
+          description: 'Has description',
+          completed: false,
+          priority: 'medium',
+          dueDate: new Date('2025-12-31T23:59:59.000Z'),
+          tags: '["tag1", "tag2"]',
+          createdAt: new Date('2025-08-27T10:00:00.000Z'),
+          updatedAt: new Date('2025-08-27T10:00:00.000Z'),
+        };
+
+        const mockUpdatedTodo = {
+          ...mockExistingTodo,
+          description: null,
+          dueDate: null,
+          tags: null,
+          updatedAt: new Date('2025-08-27T15:00:00.000Z'),
+        };
+
+        mockTodoFindUnique.mockResolvedValue(mockExistingTodo);
+        mockTodoUpdate.mockResolvedValue(mockUpdatedTodo);
+
+        const response = await request(app)
+          .put(`/test-controller/${todoId}`)
+          .send(updateData)
+          .expect(200);
+
+        expect(response.body.success).toBe(true);
+        expect(response.body.data.description).toBeNull();
+        expect(response.body.data.dueDate).toBeNull();
+        expect(response.body.data.tags).toBeNull();
+
+        expect(mockTodoUpdate).toHaveBeenCalledWith({
+          where: { id: todoId },
+          data: {
+            description: null,
+            dueDate: null,
+            tags: null,
+          },
+        });
+      });
+    });
+
+    describe('Error Handling', () => {
+      test('should return 404 when todo not found', async () => {
+        const todoId = 'non-existent-id';
+        const updateData = {
+          title: 'Updated Title'
+        };
+
+        mockTodoFindUnique.mockResolvedValue(null);
+
+        const response = await request(app)
+          .put(`/test-controller/${todoId}`)
+          .send(updateData)
+          .expect(404);
+
+        expect(response.body.success).toBe(false);
+        expect(response.body.error).toBe('Not Found');
+        expect(response.body.message).toBe('Todo not found');
+
+        expect(mockTodoFindUnique).toHaveBeenCalledWith({
+          where: { id: todoId },
+        });
+        expect(mockTodoUpdate).not.toHaveBeenCalled();
+      });
+
+      test('should handle database errors during find operation', async () => {
+        const todoId = '550e8400-e29b-41d4-a716-446655440000';
+        const updateData = {
+          title: 'Updated Title'
+        };
+
+        const dbError = new Error('Database connection failed');
+        mockTodoFindUnique.mockRejectedValue(dbError);
+
+        const response = await request(app)
+          .put(`/test-controller/${todoId}`)
+          .send(updateData)
+          .expect(500);
+
+        expect(response.body.success).toBe(false);
+        expect(response.body.error).toBe('Internal Server Error');
+        expect(response.body.message).toBe('Failed to update todo');
+
+        expect(mockTodoUpdate).not.toHaveBeenCalled();
+      });
+
+      test('should handle database errors during update operation', async () => {
+        const todoId = '550e8400-e29b-41d4-a716-446655440000';
+        const updateData = {
+          title: 'Updated Title'
+        };
+
+        const mockExistingTodo = {
+          id: todoId,
+          title: 'Original Title',
+          description: 'Original description',
+          completed: false,
+          priority: 'medium',
+          dueDate: null,
+          tags: null,
+          createdAt: new Date('2025-08-27T10:00:00.000Z'),
+          updatedAt: new Date('2025-08-27T10:00:00.000Z'),
+        };
+
+        mockTodoFindUnique.mockResolvedValue(mockExistingTodo);
+
+        const dbError = new Error('Update failed');
+        mockTodoUpdate.mockRejectedValue(dbError);
+
+        const response = await request(app)
+          .put(`/test-controller/${todoId}`)
+          .send(updateData)
+          .expect(500);
+
+        expect(response.body.success).toBe(false);
+        expect(response.body.error).toBe('Internal Server Error');
+        expect(response.body.message).toBe('Failed to update todo');
+
+        expect(mockTodoFindUnique).toHaveBeenCalledWith({
+          where: { id: todoId },
+        });
+        expect(mockTodoUpdate).toHaveBeenCalledWith({
+          where: { id: todoId },
+          data: {
+            title: 'Updated Title',
+          },
+        });
+      });
+    });
+
+    describe('Response Format', () => {
+      test('should return correct success response format', async () => {
+        const todoId = '550e8400-e29b-41d4-a716-446655440000';
+        const updateData = {
+          title: 'Updated Title'
+        };
+
+        const mockExistingTodo = {
+          id: todoId,
+          title: 'Original Title',
+          description: null,
+          completed: false,
+          priority: 'medium',
+          dueDate: null,
+          tags: null,
+          createdAt: new Date('2025-08-27T10:00:00.000Z'),
+          updatedAt: new Date('2025-08-27T10:00:00.000Z'),
+        };
+
+        const mockUpdatedTodo = {
+          ...mockExistingTodo,
+          title: 'Updated Title',
+          updatedAt: new Date('2025-08-27T16:00:00.000Z'),
+        };
+
+        mockTodoFindUnique.mockResolvedValue(mockExistingTodo);
+        mockTodoUpdate.mockResolvedValue(mockUpdatedTodo);
+
+        const response = await request(app)
+          .put(`/test-controller/${todoId}`)
+          .send(updateData)
+          .expect(200);
+
+        expect(response.body).toHaveProperty('success', true);
+        expect(response.body).toHaveProperty('data');
+        expect(response.body).toHaveProperty('message', 'Todo updated successfully');
+        expect(response.body.data).toHaveProperty('id', todoId);
+        expect(response.body.data).toHaveProperty('title', 'Updated Title');
+        expect(response.body.data).toHaveProperty('createdAt');
+        expect(response.body.data).toHaveProperty('updatedAt');
+      });
+
+      test('should format dates as ISO strings in response', async () => {
+        const todoId = '550e8400-e29b-41d4-a716-446655440000';
+        const futureDate = new Date('2025-12-31T23:59:59.000Z');
+        const updateData = {
+          dueDate: futureDate.toISOString()
+        };
+
+        const mockExistingTodo = {
+          id: todoId,
+          title: 'Test Todo',
+          description: null,
+          completed: false,
+          priority: 'medium',
+          dueDate: null,
+          tags: null,
+          createdAt: new Date('2025-08-27T10:00:00.000Z'),
+          updatedAt: new Date('2025-08-27T10:00:00.000Z'),
+        };
+
+        const mockUpdatedTodo = {
+          ...mockExistingTodo,
+          dueDate: futureDate,
+          updatedAt: new Date('2025-08-27T17:00:00.000Z'),
+        };
+
+        mockTodoFindUnique.mockResolvedValue(mockExistingTodo);
+        mockTodoUpdate.mockResolvedValue(mockUpdatedTodo);
+
+        const response = await request(app)
+          .put(`/test-controller/${todoId}`)
+          .send(updateData)
+          .expect(200);
+
+        expect(response.body.data.dueDate).toBe('2025-12-31T23:59:59.000Z');
+        expect(response.body.data.createdAt).toBe('2025-08-27T10:00:00.000Z');
+        expect(response.body.data.updatedAt).toBe('2025-08-27T17:00:00.000Z');
+      });
+    });
+
+    describe('Data Preservation', () => {
+      test('should preserve fields not included in update', async () => {
+        const todoId = '550e8400-e29b-41d4-a716-446655440000';
+        const updateData = {
+          completed: true
+        };
+
+        const mockExistingTodo = {
+          id: todoId,
+          title: 'Keep this title',
+          description: 'Keep this description',
+          completed: false,
+          priority: 'high',
+          dueDate: new Date('2025-12-31T23:59:59.000Z'),
+          tags: '["keep", "these", "tags"]',
+          createdAt: new Date('2025-08-27T10:00:00.000Z'),
+          updatedAt: new Date('2025-08-27T10:00:00.000Z'),
+        };
+
+        const mockUpdatedTodo = {
+          ...mockExistingTodo,
+          completed: true,
+          updatedAt: new Date('2025-08-27T18:00:00.000Z'),
+        };
+
+        mockTodoFindUnique.mockResolvedValue(mockExistingTodo);
+        mockTodoUpdate.mockResolvedValue(mockUpdatedTodo);
+
+        const response = await request(app)
+          .put(`/test-controller/${todoId}`)
+          .send(updateData)
+          .expect(200);
+
+        expect(response.body.data.title).toBe('Keep this title');
+        expect(response.body.data.description).toBe('Keep this description');
+        expect(response.body.data.completed).toBe(true); // Only this changed
+        expect(response.body.data.priority).toBe('high');
+        expect(response.body.data.tags).toBe('["keep", "these", "tags"]');
       });
     });
   });

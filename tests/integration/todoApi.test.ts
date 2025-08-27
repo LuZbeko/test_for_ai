@@ -260,7 +260,7 @@ describe('Todo API Integration Tests', () => {
           .post('/api/todos')
           .set('Content-Type', 'application/json')
           .send('{ invalid json }')
-          .expect(500);
+          .expect(400);
 
         expect(response.body.success).toBe(false);
         expect(response.body.error).toBeDefined();
@@ -718,6 +718,428 @@ describe('Todo API Integration Tests', () => {
       expect(orderedTodos[0].title).toBe('Third Workflow Todo');
       expect(orderedTodos[1].title).toBe('Second Workflow Todo');
       expect(orderedTodos[2].title).toBe('First Workflow Todo');
+    });
+  });
+
+  describe('PUT /api/todos/:id', () => {
+    let testTodo: any;
+
+    beforeEach(async () => {
+      // Create a test todo before each test
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 7);
+
+      testTodo = await prisma.todo.create({
+        data: {
+          title: 'Original Title',
+          description: 'Original description',
+          completed: false,
+          priority: 'medium',
+          dueDate: futureDate,
+          tags: '["original", "test"]',
+        },
+      });
+    });
+
+    describe('Successful Updates', () => {
+      test('should update todo with partial data - title only', async () => {
+        const updateData = {
+          title: 'Updated Title'
+        };
+
+        const response = await request(app)
+          .put(`/api/todos/${testTodo.id}`)
+          .send(updateData)
+          .expect(200);
+
+        expect(response.body.success).toBe(true);
+        expect(response.body.message).toBe('Todo updated successfully');
+        expect(response.body.data).toMatchObject({
+          id: testTodo.id,
+          title: 'Updated Title',
+          description: 'Original description', // Should remain unchanged
+          completed: false, // Should remain unchanged
+          priority: 'medium', // Should remain unchanged
+          tags: '["original", "test"]', // Should remain unchanged
+        });
+
+        // Verify the update was persisted in the database
+        const updatedTodo = await prisma.todo.findUnique({
+          where: { id: testTodo.id }
+        });
+
+        expect(updatedTodo).not.toBeNull();
+        expect(updatedTodo!.title).toBe('Updated Title');
+        expect(updatedTodo!.description).toBe('Original description');
+      });
+
+      test('should update multiple fields at once', async () => {
+        const futureDate = new Date();
+        futureDate.setDate(futureDate.getDate() + 30);
+
+        const updateData = {
+          title: 'Completely Updated Title',
+          description: 'Completely updated description',
+          completed: true,
+          priority: 'high',
+          dueDate: futureDate.toISOString(),
+          tags: '["updated", "integration", "test"]'
+        };
+
+        const response = await request(app)
+          .put(`/api/todos/${testTodo.id}`)
+          .send(updateData)
+          .expect(200);
+
+        expect(response.body.success).toBe(true);
+        expect(response.body.data).toMatchObject({
+          id: testTodo.id,
+          title: 'Completely Updated Title',
+          description: 'Completely updated description',
+          completed: true,
+          priority: 'high',
+          dueDate: futureDate.toISOString(),
+          tags: '["updated", "integration", "test"]',
+        });
+
+        // Verify all changes were persisted
+        const updatedTodo = await prisma.todo.findUnique({
+          where: { id: testTodo.id }
+        });
+
+        expect(updatedTodo!.completed).toBe(true);
+        expect(updatedTodo!.priority).toBe('high');
+        expect(updatedTodo!.tags).toBe('["updated", "integration", "test"]');
+      });
+
+      test('should update fields to null values', async () => {
+        const updateData = {
+          description: null,
+          dueDate: null,
+          tags: null
+        };
+
+        const response = await request(app)
+          .put(`/api/todos/${testTodo.id}`)
+          .send(updateData)
+          .expect(200);
+
+        expect(response.body.success).toBe(true);
+        expect(response.body.data).toMatchObject({
+          id: testTodo.id,
+          title: 'Original Title', // Should remain unchanged
+          description: null,
+          dueDate: null,
+          tags: null,
+        });
+
+        // Verify null values were persisted
+        const updatedTodo = await prisma.todo.findUnique({
+          where: { id: testTodo.id }
+        });
+
+        expect(updatedTodo!.description).toBeNull();
+        expect(updatedTodo!.dueDate).toBeNull();
+        expect(updatedTodo!.tags).toBeNull();
+      });
+
+      test('should handle completion status toggle', async () => {
+        // First update: mark as completed
+        await request(app)
+          .put(`/api/todos/${testTodo.id}`)
+          .send({ completed: true })
+          .expect(200);
+
+        let updatedTodo = await prisma.todo.findUnique({
+          where: { id: testTodo.id }
+        });
+        expect(updatedTodo!.completed).toBe(true);
+
+        // Second update: mark as not completed
+        await request(app)
+          .put(`/api/todos/${testTodo.id}`)
+          .send({ completed: false })
+          .expect(200);
+
+        updatedTodo = await prisma.todo.findUnique({
+          where: { id: testTodo.id }
+        });
+        expect(updatedTodo!.completed).toBe(false);
+      });
+
+      test('should update priority values', async () => {
+        const priorities = ['low', 'medium', 'high'];
+
+        for (const priority of priorities) {
+          const response = await request(app)
+            .put(`/api/todos/${testTodo.id}`)
+            .send({ priority })
+            .expect(200);
+
+          expect(response.body.data.priority).toBe(priority);
+
+          const updatedTodo = await prisma.todo.findUnique({
+            where: { id: testTodo.id }
+          });
+          expect(updatedTodo!.priority).toBe(priority);
+        }
+      });
+    });
+
+    describe('Validation Errors', () => {
+      test('should return 400 for empty request body', async () => {
+        const response = await request(app)
+          .put(`/api/todos/${testTodo.id}`)
+          .send({})
+          .expect(400);
+
+        expect(response.body.success).toBe(false);
+        expect(response.body.error).toBe('Validation Error');
+        expect(response.body.details).toContainEqual(
+          expect.objectContaining({
+            field: '',
+            message: expect.stringContaining('At least one field must be provided')
+          })
+        );
+      });
+
+      test('should return 400 for invalid title', async () => {
+        const updateData = {
+          title: '' // Empty title
+        };
+
+        const response = await request(app)
+          .put(`/api/todos/${testTodo.id}`)
+          .send(updateData)
+          .expect(400);
+
+        expect(response.body.success).toBe(false);
+        expect(response.body.error).toBe('Validation Error');
+        expect(response.body.details).toContainEqual(
+          expect.objectContaining({
+            field: 'title',
+            message: expect.stringContaining('between 1 and 255 characters')
+          })
+        );
+      });
+
+      test('should return 400 for invalid priority', async () => {
+        const updateData = {
+          priority: 'urgent' // Invalid priority
+        };
+
+        const response = await request(app)
+          .put(`/api/todos/${testTodo.id}`)
+          .send(updateData)
+          .expect(400);
+
+        expect(response.body.success).toBe(false);
+        expect(response.body.error).toBe('Validation Error');
+        expect(response.body.details).toContainEqual(
+          expect.objectContaining({
+            field: 'priority',
+            message: expect.stringContaining('low, medium, high')
+          })
+        );
+      });
+
+      test('should return 400 for invalid due date', async () => {
+        const pastDate = new Date();
+        pastDate.setDate(pastDate.getDate() - 1);
+
+        const updateData = {
+          dueDate: pastDate.toISOString()
+        };
+
+        const response = await request(app)
+          .put(`/api/todos/${testTodo.id}`)
+          .send(updateData)
+          .expect(400);
+
+        expect(response.body.success).toBe(false);
+        expect(response.body.error).toBe('Validation Error');
+        expect(response.body.details).toContainEqual(
+          expect.objectContaining({
+            field: 'dueDate',
+            message: expect.stringContaining('future date')
+          })
+        );
+      });
+
+      test('should return 400 for invalid completed value', async () => {
+        const updateData = {
+          completed: 'true' // String instead of boolean
+        };
+
+        const response = await request(app)
+          .put(`/api/todos/${testTodo.id}`)
+          .send(updateData)
+          .expect(400);
+
+        expect(response.body.success).toBe(false);
+        expect(response.body.error).toBe('Validation Error');
+        expect(response.body.details).toContainEqual(
+          expect.objectContaining({
+            field: 'completed',
+            message: expect.stringContaining('boolean')
+          })
+        );
+      });
+
+      test('should return 400 for invalid tags format', async () => {
+        const updateData = {
+          tags: 'not-json'
+        };
+
+        const response = await request(app)
+          .put(`/api/todos/${testTodo.id}`)
+          .send(updateData)
+          .expect(400);
+
+        expect(response.body.success).toBe(false);
+        expect(response.body.error).toBe('Validation Error');
+        expect(response.body.details).toContainEqual(
+          expect.objectContaining({
+            field: 'tags',
+            message: expect.stringContaining('valid JSON')
+          })
+        );
+      });
+
+      test('should return 400 for invalid UUID format', async () => {
+        const updateData = {
+          title: 'Updated Title'
+        };
+
+        const response = await request(app)
+          .put('/api/todos/invalid-uuid')
+          .send(updateData)
+          .expect(400);
+
+        expect(response.body.success).toBe(false);
+        expect(response.body.error).toBe('Validation Error');
+        expect(response.body.details).toContainEqual(
+          expect.objectContaining({
+            field: 'id',
+            message: expect.stringContaining('valid UUID')
+          })
+        );
+      });
+    });
+
+    describe('Not Found Errors', () => {
+      test('should return 404 when todo does not exist', async () => {
+        const nonExistentId = '550e8400-e29b-41d4-a716-446655440000';
+        const updateData = {
+          title: 'Updated Title'
+        };
+
+        const response = await request(app)
+          .put(`/api/todos/${nonExistentId}`)
+          .send(updateData)
+          .expect(404);
+
+        expect(response.body.success).toBe(false);
+        expect(response.body.error).toBe('Not Found');
+        expect(response.body.message).toBe('Todo not found');
+      });
+    });
+
+    describe('Response Format Validation', () => {
+      test('should return consistent success response format', async () => {
+        const updateData = {
+          title: 'Format Test Title'
+        };
+
+        const response = await request(app)
+          .put(`/api/todos/${testTodo.id}`)
+          .send(updateData)
+          .expect(200);
+
+        expect(response.body).toHaveProperty('success', true);
+        expect(response.body).toHaveProperty('data');
+        expect(response.body).toHaveProperty('message', 'Todo updated successfully');
+        expect(response.body.data).toHaveProperty('id');
+        expect(response.body.data).toHaveProperty('title');
+        expect(response.body.data).toHaveProperty('createdAt');
+        expect(response.body.data).toHaveProperty('updatedAt');
+
+        // Ensure dates are properly formatted as ISO strings
+        expect(typeof response.body.data.createdAt).toBe('string');
+        expect(typeof response.body.data.updatedAt).toBe('string');
+        expect(response.body.data.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+        expect(response.body.data.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+      });
+
+      test('should update the updatedAt timestamp', async () => {
+        const originalUpdatedAt = testTodo.updatedAt;
+        
+        // Wait a small amount to ensure timestamp difference
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        const updateData = {
+          title: 'Timestamp Test Title'
+        };
+
+        const response = await request(app)
+          .put(`/api/todos/${testTodo.id}`)
+          .send(updateData)
+          .expect(200);
+
+        const newUpdatedAt = new Date(response.body.data.updatedAt);
+        expect(newUpdatedAt.getTime()).toBeGreaterThan(originalUpdatedAt.getTime());
+
+        // Verify in database
+        const updatedTodo = await prisma.todo.findUnique({
+          where: { id: testTodo.id }
+        });
+        expect(updatedTodo!.updatedAt.getTime()).toBeGreaterThan(originalUpdatedAt.getTime());
+      });
+    });
+
+    describe('Business Logic Validation', () => {
+      test('should preserve createdAt timestamp during update', async () => {
+        const originalCreatedAt = testTodo.createdAt;
+
+        const updateData = {
+          title: 'CreatedAt Preservation Test'
+        };
+
+        const response = await request(app)
+          .put(`/api/todos/${testTodo.id}`)
+          .send(updateData)
+          .expect(200);
+
+        expect(response.body.data.createdAt).toBe(originalCreatedAt.toISOString());
+
+        // Verify in database
+        const updatedTodo = await prisma.todo.findUnique({
+          where: { id: testTodo.id }
+        });
+        expect(updatedTodo!.createdAt.getTime()).toBe(originalCreatedAt.getTime());
+      });
+
+      test('should handle due date updates correctly', async () => {
+        const newDueDate = new Date();
+        newDueDate.setDate(newDueDate.getDate() + 14);
+
+        const updateData = {
+          dueDate: newDueDate.toISOString()
+        };
+
+        const response = await request(app)
+          .put(`/api/todos/${testTodo.id}`)
+          .send(updateData)
+          .expect(200);
+
+        expect(response.body.data.dueDate).toBe(newDueDate.toISOString());
+
+        // Verify in database
+        const updatedTodo = await prisma.todo.findUnique({
+          where: { id: testTodo.id }
+        });
+        expect(updatedTodo!.dueDate!.toISOString()).toBe(newDueDate.toISOString());
+      });
     });
   });
 });

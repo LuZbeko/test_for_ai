@@ -62,11 +62,23 @@ export const handleValidationErrors = (
  * Should be the last middleware in the stack
  */
 export const handleServerErrors = (
-  error: Error,
+  error: any,
   req: Request,
   res: Response,
   _next: NextFunction
 ): void => {
+  // Handle JSON parsing errors
+  if (error.type === 'entity.parse.failed') {
+    const errorResponse: ErrorResponse = {
+      success: false,
+      error: 'Invalid JSON',
+      message: 'The request body contains invalid JSON',
+      timestamp: new Date().toISOString(),
+    };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
   console.error('Server Error:', {
     message: error.message,
     stack: error.stack,

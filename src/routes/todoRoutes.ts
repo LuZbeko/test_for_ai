@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import { TodoController } from '../controllers/TodoController';
-import { validateTodoCreation } from '../middleware/validation';
+import {
+  validateTodoCreation,
+  validateTodoUpdate,
+  validateUuidParam,
+} from '../middleware/validation';
 import { handleValidationErrors } from '../middleware/errorHandler';
 
 /**
@@ -35,8 +39,23 @@ todoRouter.get('/', TodoController.getAll);
 todoRouter.get('/:id', TodoController.getById);
 
 /**
+ * PUT /api/todos/:id - Update existing todo
+ * Middleware chain:
+ * 1. validateUuidParam - Validate the UUID parameter format
+ * 2. validateTodoUpdate - Express validator rules for partial updates
+ * 3. handleValidationErrors - Process validation errors
+ * 4. TodoController.updateTodo - Handle the request
+ */
+todoRouter.put(
+  '/:id',
+  validateUuidParam,
+  validateTodoUpdate,
+  handleValidationErrors,
+  TodoController.updateTodo
+);
+
+/**
  * Future endpoints can be added here:
- * PUT /api/todos/:id - Update todo
  * DELETE /api/todos/:id - Delete todo
  */
 
