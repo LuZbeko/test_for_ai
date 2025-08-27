@@ -155,12 +155,14 @@ export const handleNotFound = (
 export const createErrorResponse = (
   error: string,
   message?: string,
-  _statusCode: number = 500
+  _statusCode: number = 500,
+  details?: ValidationErrorDetail[]
 ): ErrorResponse => {
   return {
     success: false,
     error,
     message,
+    details,
     timestamp: new Date().toISOString(),
   };
 };

@@ -23,9 +23,19 @@ todoRouter.post(
 );
 
 /**
- * Future endpoints can be added here:
  * GET /api/todos - Get all todos
+ * No middleware needed - controller handles all logic
+ */
+todoRouter.get('/', TodoController.getAll);
+
+/**
  * GET /api/todos/:id - Get todo by ID
+ * No additional validation middleware needed - controller validates UUID format
+ */
+todoRouter.get('/:id', TodoController.getById);
+
+/**
+ * Future endpoints can be added here:
  * PUT /api/todos/:id - Update todo
  * DELETE /api/todos/:id - Delete todo
  */
