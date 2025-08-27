@@ -8,7 +8,7 @@
 ### Features
 
 - [x] Project setup with TypeScript, Express, and database configuration - Initialize Node.js project with TypeScript support `S`
-- [ ] Create Todo endpoint - POST /todos with validation and ID generation `S`
+- [x] Create Todo endpoint - POST /todos with validation and ID generation `S` ✅ 2025-08-27
 - [ ] Read Todo endpoints - GET /todos and GET /todos/:id with proper responses `S`
 - [ ] Update Todo endpoint - PUT /todos/:id with partial update support `S`
 - [ ] Delete Todo endpoint - DELETE /todos/:id with proper status codes `XS`
