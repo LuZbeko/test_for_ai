@@ -1,8 +1,10 @@
-import express, { Application, Request, Response, NextFunction } from 'express';
+import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { checkDatabaseConnection } from './config/database';
+import { apiRouter } from './routes';
+import { handleNotFound, handleServerErrors } from './middleware/errorHandler';
 
 dotenv.config();
 
@@ -13,6 +15,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Health check endpoint
 app.get('/health', async (_req: Request, res: Response) => {
   const dbStatus = await checkDatabaseConnection();
 
@@ -25,15 +28,13 @@ app.get('/health', async (_req: Request, res: Response) => {
   });
 });
 
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('Error:', err.message);
-  res.status(500).json({
-    error: 'Internal Server Error',
-    message:
-      process.env['NODE_ENV'] === 'development'
-        ? err.message
-        : 'Something went wrong',
-  });
-});
+// Mount API routes
+app.use('/api', apiRouter);
+
+// Handle 404 errors for undefined routes
+app.use(handleNotFound);
+
+// Global error handling middleware (must be last)
+app.use(handleServerErrors);
 
 export default app;
